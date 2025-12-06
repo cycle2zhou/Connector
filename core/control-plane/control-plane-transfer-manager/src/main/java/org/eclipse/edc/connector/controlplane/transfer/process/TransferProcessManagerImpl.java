@@ -48,7 +48,7 @@ import org.eclipse.edc.spi.query.Criterion;
 import org.eclipse.edc.spi.response.ResponseStatus;
 import org.eclipse.edc.spi.response.StatusResult;
 import org.eclipse.edc.spi.retry.WaitStrategy;
-import org.eclipse.edc.spi.security.ParticipantVault;
+import org.eclipse.edc.spi.security.Vault;
 import org.eclipse.edc.spi.types.domain.DataAddress;
 import org.eclipse.edc.statemachine.AbstractStateEntityManager;
 import org.eclipse.edc.statemachine.Processor;
@@ -116,7 +116,7 @@ public class TransferProcessManagerImpl extends AbstractStateEntityManager<Trans
     private ProvisionManager provisionManager;
     private RemoteMessageDispatcherRegistry dispatcherRegistry;
     private DataFlowManager dataFlowManager;
-    private ParticipantVault vault;
+    private Vault vault;
     private TransferProcessObservable observable;
     private DataAddressResolver addressResolver;
     private PolicyArchive policyArchive;
@@ -243,14 +243,6 @@ public class TransferProcessManagerImpl extends AbstractStateEntityManager<Trans
             // default the content address to the asset address; this may be overridden during provisioning
             process.setContentDataAddress(dataAddress);
 
-            var dataDestination = process.getDataDestination();
-            if (dataDestination != null) {
-                var secret = dataDestination.getStringProperty(EDC_DATA_ADDRESS_SECRET);
-                if (secret != null) {
-                    vault.storeSecret(process.getParticipantContextId(), dataDestination.getKeyName(), secret);
-                }
-            }
-
             var manifest = manifestGenerator.generateProviderResourceManifest(process, dataAddress, policy);
             if (!manifest.empty()) {
                 monitor.warning("control-plane provisioning has been deprecated, please convert your provision extensions to the data-plane model and deploy them there.");
@@ -331,7 +323,7 @@ public class TransferProcessManagerImpl extends AbstractStateEntityManager<Trans
             var dataDestination = Optional.ofNullable(originalDestination)
                     .map(DataAddress::getKeyName)
                     .map(key -> vault.resolveSecret(process.getParticipantContextId(), key))
-                    .map(secret -> DataAddress.Builder.newInstance().properties(originalDestination.getProperties()).property(EDC_DATA_ADDRESS_SECRET, secret).build())
+                    .map(secret -> originalDestination.toBuilder().property(EDC_DATA_ADDRESS_SECRET, secret).build())
                     .orElse(originalDestination);
 
             var messageBuilder = TransferRequestMessage.Builder.newInstance()
@@ -794,7 +786,7 @@ public class TransferProcessManagerImpl extends AbstractStateEntityManager<Trans
             return this;
         }
 
-        public Builder vault(ParticipantVault vault) {
+        public Builder vault(Vault vault) {
             manager.vault = vault;
             return this;
         }

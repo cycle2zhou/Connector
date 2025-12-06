@@ -55,7 +55,7 @@ import org.eclipse.edc.spi.query.Criterion;
 import org.eclipse.edc.spi.response.StatusResult;
 import org.eclipse.edc.spi.result.Result;
 import org.eclipse.edc.spi.retry.ExponentialWaitStrategy;
-import org.eclipse.edc.spi.security.ParticipantVault;
+import org.eclipse.edc.spi.security.Vault;
 import org.eclipse.edc.spi.types.domain.DataAddress;
 import org.eclipse.edc.spi.types.domain.callback.CallbackAddress;
 import org.eclipse.edc.statemachine.retry.EntityRetryProcessConfiguration;
@@ -144,7 +144,7 @@ class TransferProcessManagerImplTest {
     private final TransferProcessStore transferProcessStore = mock();
     private final PolicyArchive policyArchive = mock();
     private final DataFlowManager dataFlowManager = mock();
-    private final ParticipantVault vault = mock();
+    private final Vault vault = mock();
     private final Clock clock = Clock.systemUTC();
     private final TransferProcessListener listener = mock();
     private final DataspaceProfileContextRegistry dataspaceProfileContextRegistry = mock();
@@ -896,29 +896,6 @@ class TransferProcessManagerImplTest {
                 assertThat(actualTransferProcess.getState()).isEqualTo(PROVISIONING.code());
                 assertThat(actualTransferProcess.getContentDataAddress()).isSameAs(contentDataAddress);
                 assertThat(actualTransferProcess.getResourceManifest()).isSameAs(resourceManifest);
-            });
-        }
-
-        @Test
-        void shouldStoreSecret_whenItIsFoundInTheDataAddress() {
-            var destinationDataAddress = DataAddress.Builder.newInstance()
-                    .keyName("keyName")
-                    .type("type")
-                    .property(EDC_DATA_ADDRESS_SECRET, "secret")
-                    .build();
-            var transferProcess = builder.dataDestination(destinationDataAddress).build();
-            when(policyArchive.findPolicyForContract(anyString())).thenReturn(Policy.Builder.newInstance().build());
-            when(transferProcessStore.nextNotLeased(anyInt(), stateIs(INITIAL.code()))).thenReturn(List.of(transferProcess)).thenReturn(emptyList());
-            when(addressResolver.resolveForAsset(any())).thenReturn(DataAddress.Builder.newInstance().type("type").build());
-            var resourceManifest = ResourceManifest.Builder.newInstance().definitions(List.of(new TestResourceDefinition())).build();
-            when(manifestGenerator.generateProviderResourceManifest(any(TransferProcess.class), any(), any()))
-                    .thenReturn(resourceManifest);
-
-            manager.start();
-
-            await().untilAsserted(() -> {
-                verify(vault).storeSecret(anyString(), eq("keyName"), eq("secret"));
-                verify(transferProcessStore).save(any());
             });
         }
 
